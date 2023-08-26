@@ -22,7 +22,7 @@ class TrainTestmAP:
         self.val_df = self.metadata_df[self.metadata_df['mAP'] == bias_threshold]
         self.train_df = self.metadata_df.drop(self.val_df.index)
 
-    def save_to_csv(self, train_name='train-stem-8.csv', val_name='val-stem-8.csv'):
+    def save_to_csv(self, train_name='train.csv', val_name='val.csv'):
         if self.train_df is not None:
             self.train_df.to_csv(train_name, index=False)
         if self.val_df is not None:
