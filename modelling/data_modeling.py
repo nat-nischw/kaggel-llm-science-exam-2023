@@ -1,4 +1,6 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import StratifiedGroupKFold
 
 class GroupKFoldmAP:
@@ -61,9 +63,59 @@ class GroupKFoldmAP:
             train_set.to_csv(f'train_fold-{fold}.csv', index=False)
             val_set.to_csv(f'val_fold-{fold}.csv', index=False)
 
+    def visualize_distributions(self, distributions):
+        # Extracting data
+        folds = [item['fold'] for item in distributions]
+
+        pos_train = [item['train_set']['mAP'].sum() for item in distributions]
+        neg_train = [len(item['train_set']) - item['train_set']['mAP'].sum() for item in distributions]
+        pos_val = [item['val_set']['mAP'].sum() for item in distributions]
+        neg_val = [len(item['val_set']) - item['val_set']['mAP'].sum() for item in distributions]
+
+
+        # Plotting
+        bar_width = 0.35
+        index = range(len(folds))
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bar1 = ax.bar(index, pos_train, bar_width, label='Train Positive', color='b')
+        bar2 = ax.bar(index, neg_train, bar_width, bottom=pos_train, label='Train Negative', color='r')
+        bar3 = ax.bar([i + bar_width for i in index], pos_val, bar_width, label='Val Positive', color='c')
+        bar4 = ax.bar([i + bar_width for i in index], neg_val, bar_width, bottom=pos_val, label='Val Negative', color='m')
+
+        def label_percentages(bar1, bar2, ax):
+            """Attach a percentage label for each segment of the stacked bars."""
+            for i in range(len(bar1)):
+                pos_height = bar1[i].get_height()
+                neg_height = bar2[i].get_height()
+                total = pos_height + neg_height
+                pos_percentage = (pos_height / total) * 100
+                neg_percentage = (neg_height / total) * 100
+
+                ax.annotate(f'{pos_percentage:.1f}%',
+                            xy=(bar1[i].get_x() + bar1[i].get_width() / 2, pos_height / 2),
+                            ha='center', va='center')
+                ax.annotate(f'{neg_percentage:.1f}%',
+                            xy=(bar2[i].get_x() + bar2[i].get_width() / 2, pos_height + neg_height / 2),
+                            ha='center', va='center')
+
+        label_percentages(bar1, bar2, ax)
+        label_percentages(bar3, bar4, ax)
+
+        ax.set_xlabel('Fold Number')
+        ax.set_ylabel('Number of Samples')
+        ax.set_title('Distribution of samples across folds (in %)')
+        ax.set_xticks([i + bar_width/2 for i in index])
+        ax.set_xticklabels([f'Fold {i}' for i in folds])
+        ax.legend()
+
+        plt.tight_layout()
+        plt.show()
+
 
 if __name__ == "__main__":
     kfold = GroupKFoldmAP('input_file.csv')
-    kfold.load_and_preprocess_data(bias_threshold=0.6)  
+    kfold.load_and_preprocess_data(bias_threshold=0.5)  
     distributions = kfold.stratified_group_kfold()
+    kfold.visualize_distributions(distributions)
     kfold.save_to_csv(distributions)
