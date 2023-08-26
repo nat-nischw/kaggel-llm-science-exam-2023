@@ -1,1 +1,1 @@
-# LLM-STEM
+# Kaggle - LLM Science Exam - 2023

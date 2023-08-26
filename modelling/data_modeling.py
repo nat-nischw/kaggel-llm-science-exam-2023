@@ -3,6 +3,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import StratifiedGroupKFold
 
+
+class TrainTestmAP:
+    def __init__(self, dataset_path):
+        self.dataset_path = dataset_path
+        self.metadata_df = None
+        self.train_df = None
+        self.val_df = None
+
+    def load_and_preprocess_data(self):
+        self.metadata_df = pd.read_csv(self.dataset_path)
+        self.metadata_df = self.metadata_df.drop_duplicates(subset="prompt", keep='last')
+
+    def get_mAP_distribution(self):
+        return self.metadata_df['mAP'].value_counts(normalize=True)
+
+    def perform_train_val_split(self, bias_threshold=0.5):
+        self.val_df = self.metadata_df[self.metadata_df['mAP'] == bias_threshold]
+        self.train_df = self.metadata_df.drop(self.val_df.index)
+
+    def save_to_csv(self, train_name='train-stem-8.csv', val_name='val-stem-8.csv'):
+        if self.train_df is not None:
+            self.train_df.to_csv(train_name, index=False)
+        if self.val_df is not None:
+            self.val_df.to_csv(val_name, index=False)
+
+
 class GroupKFoldmAP:
     def __init__(self, dataset_path, n_splits=4):
         self.dataset_path = dataset_path
@@ -113,9 +139,21 @@ class GroupKFoldmAP:
         plt.show()
 
 
+'''
 if __name__ == "__main__":
+    # TrainTestmAP
+    tt = TrainTestmAP('input_file.csv')
+    tt.load_and_preprocess_data()
+    mAP_distribution = tt.get_mAP_distribution()
+    print(mAP_distribution)
+    tt.perform_train_val_split(bias_threshold=0.5)
+    tt.save_to_csv()
+
+
+    # GroupKFoldmAP
     kfold = GroupKFoldmAP('input_file.csv')
     kfold.load_and_preprocess_data(bias_threshold=0.5)  
     distributions = kfold.stratified_group_kfold()
     kfold.visualize_distributions(distributions)
     kfold.save_to_csv(distributions)
+'''
