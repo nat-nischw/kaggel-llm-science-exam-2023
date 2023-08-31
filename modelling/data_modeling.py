@@ -139,21 +139,21 @@ class GroupKFoldmAP:
         plt.show()
 
 
-'''
+
 if __name__ == "__main__":
     # TrainTestmAP
     tt = TrainTestmAP('input_file.csv')
     tt.load_and_preprocess_data()
     mAP_distribution = tt.get_mAP_distribution()
     print(mAP_distribution)
-    tt.perform_train_val_split(bias_threshold=0.5)
+    tt.perform_train_val_split(bias_threshold=1)
     tt.save_to_csv()
 
-
     # GroupKFoldmAP
-    kfold = GroupKFoldmAP('input_file.csv')
+    kfold = GroupKFoldmAP(
+        dataset_path='input_file.csv', 
+        n_splits=5)
     kfold.load_and_preprocess_data(bias_threshold=0.5)  
     distributions = kfold.stratified_group_kfold()
     kfold.visualize_distributions(distributions)
     kfold.save_to_csv(distributions)
-'''
