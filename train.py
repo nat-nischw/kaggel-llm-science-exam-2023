@@ -94,11 +94,11 @@ class TrainingPipeline:
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=512)
         self.model = AutoModelForMultipleChoice.from_pretrained(cfg.MODEL, ignore_mismatched_sizes=True)
         
-        if cfg,FREEZE_EMBEDDINGS:
+        if cfg.FREEZE_EMBEDDINGS:
             logging.info('Freezing embeddings.')
             for param in self.model.deberta.embeddings.parameters():
                 param.requires_grad = False
-        if cfg,FREEZE_LAYERS > 0:
+        if cfg.FREEZE_LAYERS > 0:
             logging.info(f'Freezing {cfg.FREEZE_LAYERS} layers.')
             for layer in self.model.deberta.encoder.layer[:cfg.FREEZE_LAYERS]:
                 for param in layer.parameters():
