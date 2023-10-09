@@ -1,3 +1,5 @@
+################## genprompt environment ##################
+pip install openai itables plotly python-dotenv Wikipedia-API 
 ################## tranning environment ##################
 pip install git+https://github.com/huggingface/transformers
 pip install --upgrade wandb

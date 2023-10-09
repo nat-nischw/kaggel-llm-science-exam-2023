@@ -7,7 +7,7 @@ from langchain.prompts import PromptTemplate
 
 import config as cfg
 
-class QAevaluation:
+class QAEvaluation:
     def __init__(self, file_paths=cfg.EVA_PATH_CSV, model_name=cfg.MODEL_EVA):
         self.file_paths = file_paths
         self.model_name = model_name
@@ -142,5 +142,5 @@ class QAevaluation:
         return self.evaluate()
 
 if __name__ == "__main__":
-    evaluator = QAevaluation()
+    evaluator = QAEvaluation()
     evaluator.run()
