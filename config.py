@@ -48,3 +48,4 @@ OVERWRITE_OUTPUT_DIR = True
 ################## OUTPUT DIRECTORY ##################
 # Output directory
 OUTPUT_DIR = f'./output/{MODEL}-ver{VER}'
+
