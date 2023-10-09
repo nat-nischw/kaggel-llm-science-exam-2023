@@ -116,7 +116,7 @@ class EvalModel:
         return mAP
 
 class TrainingPipeline:
-    def __init__(self, train_file, val_file):
+    def __init__(self, train_file=cfg.INPUT_TRAIN, val_file=cfg.INPUT_VAL):
         self.train_file = train_file
         self.val_file = val_file
         self.option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
@@ -192,7 +192,7 @@ class TrainingPipeline:
     def save_model(self):
         self.trainer.save_model(cfg.OUTPUT_DIR)
 
-    def evaluate(self, eva_file):
+    def evaluate(self, eva_file=cfg.INPUT_EVA):
         evaluator = EvalModel(cfg.OUTPUT_DIR, eva_file, self.preprocess)
         return evaluator.evaluate()
 
@@ -216,17 +216,12 @@ class TrainingPipeline:
         self.save_model()
     
         logging.info("Evaluating model...")
-        self.evaluate(eva_file)
+        self.evaluate()
     
         logging.info("Pipeline completed.")
 
 if __name__ == "__main__":
 
-    
-    train_file = "./data/train-stem-wiki.csv"
-    val_file = "./data/val-stem-wiki.csv"
-    eva_file = "./data/eval-stem-wiki.csv"
-
-    pipeline = TrainingPipeline(train_file, val_file)
+    pipeline = TrainingPipeline()
     pipeline.run_pipeline()
-    pipeline.evaluate(eva_file)
+    pipeline.evaluate()

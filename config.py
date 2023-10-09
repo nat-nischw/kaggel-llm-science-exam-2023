@@ -1,7 +1,20 @@
-################## General Configs ##################
+################## EVALUTION CONFIGs ##################
+MODEL_EVA = 'NousResearch/Nous-Hermes-Llama2-13b'
+EVA_PATH_CSV = './data/qa.csv'
+# report to wandb
+PROJECT_NAME = 'kaggle-llm-science-exam-2023' 
+PROMPT_TEMP = """Answer the following multiple choice question by giving the most appropriate response. Answer should be one among [A, B, C, D, E]
+Question: {prompt}\n
+A) {a}\n
+B) {b}\n
+C) {c}\n
+D) {d}\n
+E) {e}\n
+
+Answer:"""
+
+################## General CONFIGs ##################
 VER=11
-# TRAIN WITH SUBSET OF 60K
-NUM_TRAIN_SAMPLES = 1_024
 # PARAMETER EFFICIENT FINE TUNING
 # PEFT REQUIRES 1XP100 GPU NOT 2XT4
 USE_PEFT = False
@@ -45,7 +58,9 @@ REPORT_TO = 'none'
 # OVERWRITE OUTPUT DIRECTORY
 OVERWRITE_OUTPUT_DIR = True
 
-################## OUTPUT DIRECTORY ##################
-# Output directory
+################## INPUT/OUTPUT DIRECTORY ##################
+INPUT_TRAIN = './data/train.csv'
+INPUT_VAL = './data/val.csv'
+INPUT_EVA = './data/eva.csv'
 OUTPUT_DIR = f'./output/{MODEL}-ver{VER}'
 
