@@ -1,3 +1,4 @@
+################## General Configs ##################
 VER=11
 # TRAIN WITH SUBSET OF 60K
 NUM_TRAIN_SAMPLES = 1_024
@@ -13,7 +14,8 @@ FREEZE_EMBEDDINGS = True
 MAX_INPUT = 512
 # HUGGING FACE MODEL
 MODEL = 'microsoft/deberta-v3-large'
-### TRAINING PARAMETERS ###
+
+################## TRAINING PARAMETERS ##################
 # EARLY STOPPING PATIENCE
 EARLY_STOPPING = 1
 # NUMBER OF EPOCHS
@@ -43,6 +45,6 @@ REPORT_TO = 'none'
 # OVERWRITE OUTPUT DIRECTORY
 OVERWRITE_OUTPUT_DIR = True
 
-### OUTPUT DIRECTORY ##
+################## OUTPUT DIRECTORY ##################
 # Output directory
 OUTPUT_DIR = f'./output/{MODEL}-ver{VER}'
