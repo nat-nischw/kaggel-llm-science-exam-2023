@@ -6,7 +6,6 @@ import uuid, wandb
 from langchain.prompts import PromptTemplate
 
 import config as cfg
-import config as cfg
 
 class QAevaluation:
     def __init__(self, file_paths=cfg.EVA_PATH_CSV, model_name=cfg.MODEL_EVA):
