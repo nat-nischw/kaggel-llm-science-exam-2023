@@ -17,7 +17,6 @@ from transformers import AutoModelForMultipleChoice, TrainingArguments, Trainer
 
 import config as cfg
 
-
 # set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -68,6 +67,54 @@ class DataCollatorForMultipleChoice:
         batch['labels'] = torch.tensor(labels, dtype=torch.int64)
         return batch
 
+class EvalModel:
+    def __init__(self, model_path, test_file, preprocess_function, max_input=384):
+        self.test_file = test_file
+        self.preprocess = preprocess_function
+        self.MAX_INPUT = max_input
+        self.model = AutoModelForMultipleChoice.from_pretrained(model_path)
+        self.trainer = Trainer(model=self.model)
+
+    @staticmethod
+    def precision_at_k(r, k):
+        """Precision at k"""
+        assert k <= len(r)
+        assert k != 0
+        return sum(int(x) for x in r[:k]) / k
+
+    @staticmethod
+    def MAP_at_3(predictions, true_items):
+        """
+        Score is mean average precision at 3
+        ref: https://www.kaggle.com/code/philippsinger/h2ogpt-perplexity-ranking
+        """
+        U = len(predictions)
+        map_at_3 = 0.0
+        for u in range(U):
+            user_preds = predictions[u].split()
+            user_true = true_items[u]
+            user_results = [1 if item == user_true else 0 for item in user_preds]
+            for k in range(min(len(user_preds), 3)):
+                map_at_3 += EvalModel.precision_at_k(user_results, k + 1) * user_results[k]
+        return map_at_3 / U
+
+    def evaluate(self):
+        test_df = pd.read_csv(self.test_file)
+        tokenized_test_dataset = Dataset.from_pandas(test_df).map(
+            self.preprocess, remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E']
+        )
+        
+        test_predictions = self.trainer.predict(tokenized_test_dataset).predictions
+        predictions_as_ids = np.argsort(-test_predictions, 1)
+        predictions_as_answer_letters = np.array(list('ABCDE'))[predictions_as_ids]
+
+        predictions_as_string = test_df['prediction'] = [' '.join(row) for row in predictions_as_answer_letters[:, :3]]
+        logging.info(predictions_as_string)
+
+        mAP = EvalModel.MAP_at_3(test_df.prediction.values, test_df.answer.values)
+        logging.info(f'CV MAP@3 = {mAP}')
+        return mAP
+
 class TrainingPipeline:
     def __init__(self, train_file, val_file):
         self.train_file = train_file
@@ -112,21 +159,21 @@ class TrainingPipeline:
 
     def configure_training(self):
         training_args = TrainingArguments(
-            warmup_ratio=0.8,
-            learning_rate=2e-6,
-            per_device_train_batch_size=4,
-            per_device_eval_batch_size=3,
-            num_train_epochs=2,
-            report_to='none',
-            output_dir = f'output/checkpoints_{cfg.VER}',
-            overwrite_output_dir=True,
-            fp16=True,
-            evaluation_strategy='epoch',
-            save_strategy="epoch",
-            metric_for_best_model='map@3',
-            lr_scheduler_type='cosine',
-            save_total_limit=2,
-            seed=42,
+            warmup_ratio=cfg.WARMUP_RATIO,
+            learning_rate=cfg.LR,
+            per_device_train_batch_size=cfg.BATCH_SIZE,
+            per_device_eval_batch_size=cfg.BATCH_SIZE,
+            num_train_epochs=cfg.EPOCHS,
+            report_to=cfg.REPORT_TO,
+            output_dir = cfg.OUTPUT_DIR,
+            overwrite_output_dir=cfg.OVERWRITE_OUTPUT_DIR,
+            fp16=cfg.FP16,
+            evaluation_strategy=cfg.EVALUATION_STRATEGY,
+            save_strategy=cfg.SAVE_STRATEGY,
+            metric_for_best_model=cfg.METRIC_FOR_BEST_MODEL,
+            lr_scheduler_type=cfg.LR_SCHEDULER_TYPE,
+            save_total_limit=cfg.SAVE_TOTAL_LIMIT,
+            seed=cfg.SEED,
         )
         self.trainer = Trainer(
             model=self.model,
@@ -136,6 +183,7 @@ class TrainingPipeline:
             train_dataset=self.tokenized_dataset,
             eval_dataset=self.tokenized_dataset_valid,
             compute_metrics=ComputeMetrics(),
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=cfg.EARLY_STOPPING)] 
         )
 
     def train(self):
@@ -143,6 +191,10 @@ class TrainingPipeline:
 
     def save_model(self):
         self.trainer.save_model(cfg.OUTPUT_DIR)
+
+    def evaluate(self, eva_file):
+        evaluator = EvalModel(cfg.OUTPUT_DIR, eva_file, self.preprocess)
+        return evaluator.evaluate()
 
     def run_pipeline(self):
         logging.info("Setting up model and tokenizer...")
@@ -163,6 +215,9 @@ class TrainingPipeline:
         logging.info("Saving model...")
         self.save_model()
     
+        logging.info("Evaluating model...")
+        self.evaluate(eva_file)
+    
         logging.info("Pipeline completed.")
 
 if __name__ == "__main__":
@@ -170,6 +225,8 @@ if __name__ == "__main__":
     
     train_file = "./data/train-stem-wiki.csv"
     val_file = "./data/val-stem-wiki.csv"
+    eva_file = "./data/eval-stem-wiki.csv"
 
     pipeline = TrainingPipeline(train_file, val_file)
     pipeline.run_pipeline()
+    pipeline.evaluate(eva_file)
