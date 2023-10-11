@@ -173,6 +173,7 @@ class TrainingPipeline:
             metric_for_best_model=cfg.METRIC_FOR_BEST_MODEL,
             lr_scheduler_type=cfg.LR_SCHEDULER_TYPE,
             save_total_limit=cfg.SAVE_TOTAL_LIMIT,
+            load_best_model_at_end=cfg.LOAD_BEST_MODEL_AT_END,
             seed=cfg.SEED,
         )
         self.trainer = Trainer(

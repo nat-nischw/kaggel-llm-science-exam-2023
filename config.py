@@ -107,6 +107,8 @@ FP16 = True
 REPORT_TO = 'none'
 # OVERWRITE OUTPUT DIRECTORY
 OVERWRITE_OUTPUT_DIR = True
+# LOAD BEST MODEL AT END
+LOAD_BEST_MODEL_AT_END = True
 
 ################## INPUT/OUTPUT DIRECTORY ##################
 INPUT_TRAIN = './data/train-val/train.csv'
