@@ -109,8 +109,8 @@ REPORT_TO = 'none'
 OVERWRITE_OUTPUT_DIR = True
 
 ################## INPUT/OUTPUT DIRECTORY ##################
-INPUT_TRAIN = './data/train.csv'
-INPUT_VAL = './data/val.csv'
+INPUT_TRAIN = './data/train-val/train.csv'
+INPUT_VAL = './data/train-val/val.csv'
 INPUT_EVA = './data/eva.csv'
 OUTPUT_DIR = f'./output/{MODEL}-ver{VER}'
 
