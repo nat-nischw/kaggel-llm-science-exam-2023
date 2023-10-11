@@ -9,7 +9,7 @@ pip install datasets
 ### val_data = dataset['validation']
 ### val_data.to_csv('data/train-val/val.csv')
 
-### *** actually can you :: train_data = dataset['train'], val_data = dataset['validation'], test_data = dataset['data/train-val/test'] *** ###
+### *** you can :: train_data = dataset['train'], val_data = dataset['validation'] *** ###
 
 ################## genprompt environment ##################
 pip install openai itables plotly python-dotenv Wikipedia-API 
