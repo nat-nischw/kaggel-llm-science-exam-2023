@@ -2,7 +2,10 @@
 mkdir -p data/train-val/
 pip install datasets
 python fetch_data.py
-### *** you can :: train_data = dataset['train'], val_data = dataset['validation'] *** ###
+### *** you can use this code to load data from huggingface datasets *** ###
+### from datasets import load_dataset
+### dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG")
+### train_data, val_data = dataset['train'], dataset['validation'] ###
 
 ################## genprompt environment ##################
 pip install openai itables plotly python-dotenv Wikipedia-API 
