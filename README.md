@@ -1,2 +1,3 @@
 # Kaggle - LLM Science Exam - 2023
-![Pipeline](asset/pipeline.png)
+<img src="asset/pipeline.png" width="600" height="400">
+
