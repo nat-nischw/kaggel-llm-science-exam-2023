@@ -9,6 +9,10 @@ In the Kaggle competition, we are not able to unlock certain features because Ka
 ```
 bash run.sh
 ```
+## Fine-Tuning
+```
+python train.py
+```
 
 ## Team Members
 Teetouch Jaknamon - [@TeetouchQQ](https://github.com/TeetouchQQ), Natapong Nitarach- [@nat-nischw](https://github.com/nat-nischw), Kunat Pipatanakul (Guest) - [@kunato](https://github.com/kunato), Sittipong Sripaisarnmongkol (Guest) - [@pongib](https://github.com/pongib), Phatrasek Jirabovonvisut (Guest) - [@yoyoismee](https://github.com/yoyoismee)

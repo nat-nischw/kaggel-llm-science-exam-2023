@@ -8,7 +8,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase, Paddin
 
 from typing import Optional, Union
 import pandas as pd, numpy as np, torch
-from datasets import Dataset
+from datasets import Dataset,load_dataset
 from dataclasses import dataclass
 from transformers import AutoTokenizer
 from transformers import EarlyStoppingCallback
@@ -19,25 +19,6 @@ import config as cfg
 
 # set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-class ComputeMetrics:
-    def __init__(self, preds, labels):
-        self.preds = preds
-        self.labels = labels
-
-    @staticmethod
-    def map_at_3(predictions, labels):
-        map_sum = 0
-        pred = np.argsort(-1 * np.array(predictions), axis=1)[:, :3]
-        for x, y in zip(pred, labels):
-            z = [1/i if y==j else 0 for i, j in zip([1, 2, 3], x)]
-            map_sum += np.sum(z)
-        return map_sum / len(predictions)
-
-    def compute(self, p):
-        predictions = p.predictions.tolist()
-        labels = p.label_ids.tolist()
-        return {"map@3": self.map_at_3(predictions, labels)}
 
 @dataclass
 class DataCollatorForMultipleChoice:
@@ -116,26 +97,40 @@ class EvalModel:
         return mAP
 
 class TrainingPipeline:
-    def __init__(self, train_file=cfg.INPUT_TRAIN, val_file=cfg.INPUT_VAL):
-        self.train_file = train_file
-        self.val_file = val_file
+    def __init__(self):
         self.option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
         self.index_to_option = {v: k for k, v in self.option_to_index.items()}
-
+        self.tokenizer = None
+        self.model = None
+        self.dataset = None
+        self.train_data = None
+        self.val_data = None
+        self.MAX_INPUT = cfg.MAX_INPUT  
+    
     def preprocess(self, example):
-        """ Preprocess a single example"""
-        first_sentence = [ "[CLS] " + example['context'] ] * 5
-        second_sentences = [" #### " + example['prompt'] + " [SEP] " + example[option] + " [SEP]" for option in 'ABCDE']
-        tokenized_example = self.tokenizer(first_sentence, second_sentences, truncation='only_first',
-                                    max_length=cfg.MAX_INPUT, add_special_tokens=False)
-        tokenized_example['label'] = self.index_to_optionx[example['answer']]
+        context = " ".join(example['context']) if isinstance(example['context'], list) else example['context']
+        first_sentence = ["[CLS] " + context] * 5
+        prompt = example['prompt'] if isinstance(example['prompt'], str) else " ".join(example['prompt'])
+        second_sentences = [
+            " #### " + prompt + " [SEP] " + 
+            (" ".join(example[option]) if isinstance(example[option], list) else example[option]) + 
+            " [SEP]" for option in 'ABCDE'
+        ]
+        tokenized_example = self.tokenizer(first_sentence, second_sentences, 
+                                        padding=True, truncation=True, 
+                                        max_length=self.MAX_INPUT, add_special_tokens=False)
 
+        tokenized_example['label'] = self.option_to_index[example['answer']]
         return tokenized_example
 
+    def not_none(self, example):
+        fields_to_check = ['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer']
+        return all(example[field] is not None for field in fields_to_check)
+
     def load_data(self):
-        self.dataset_valid = Dataset.from_pandas(self.val_file)
-        self.dataset = Dataset.from_pandas(self.train_file)
-        self.dataset = self.dataset.remove_columns(["__index_level_0__"])
+        self.dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG")
+        self.train_data = self.dataset['train'].filter(self.not_none)
+        self.val_data = self.dataset['validation'].filter(self.not_none)
 
     def setup_model_and_tokenizer(self):
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=512)
@@ -152,11 +147,28 @@ class TrainingPipeline:
                     param.requires_grad = False
 
     def map_dataset(self):
-        self.tokenized_dataset_valid = self.dataset_valid.map(self.preprocess, 
-            remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'])
-        self.tokenized_dataset = self.dataset.map(self.preprocess, 
-            remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'])
+        self.tokenized_train = self.train_data.map(
+            self.preprocess,  
+            remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'], 
+        )
+        
+        self.tokenized_valid = self.val_data.map(
+            self.preprocess, 
+            remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'],
+        )
+    def map_at_3(predictions, labels):
+        map_sum = 0
+        pred = np.argsort(-1*np.array(predictions),axis=1)[:,:3]
+        for x,y in zip(pred,labels):
+            z = [1/i if y==j else 0 for i,j in zip([1,2,3],x)]
+            map_sum += np.sum(z)
+        return map_sum / len(predictions)
 
+    def compute_metrics(p):
+        predictions = p.predictions.tolist()
+        labels = p.label_ids.tolist()
+        return {"map@3": self.map_at_3(predictions, labels)}
+        
     def configure_training(self):
         training_args = TrainingArguments(
             warmup_ratio=cfg.WARMUP_RATIO,
@@ -168,7 +180,7 @@ class TrainingPipeline:
             output_dir = cfg.OUTPUT_DIR,
             overwrite_output_dir=cfg.OVERWRITE_OUTPUT_DIR,
             fp16=cfg.FP16,
-            evaluation_strategy=cfg.EVALUATION_STRATEGY,
+            evaluation_strategy=cfg.EVAL_STRATEGY,
             save_strategy=cfg.SAVE_STRATEGY,
             metric_for_best_model=cfg.METRIC_FOR_BEST_MODEL,
             lr_scheduler_type=cfg.LR_SCHEDULER_TYPE,
@@ -181,9 +193,9 @@ class TrainingPipeline:
             args=training_args,
             tokenizer=self.tokenizer,
             data_collator=DataCollatorForMultipleChoice(tokenizer=self.tokenizer),
-            train_dataset=self.tokenized_dataset,
-            eval_dataset=self.tokenized_dataset_valid,
-            compute_metrics=ComputeMetrics(),
+            train_dataset=self.tokenized_train,
+            eval_dataset=self.tokenized_valid,
+            compute_metrics=self.compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=cfg.EARLY_STOPPING)] 
         )
 
