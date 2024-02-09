@@ -157,8 +157,8 @@ class TrainingPipeline:
 
     def load_data(self):
         self.dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG")
-        self.train_data = self.dataset['train'].filter(self.not_none).shuffle(seed=42).select(range(20))
-        self.val_data = self.dataset['validation'].filter(self.not_none).shuffle(seed=42).select(range(20))
+        self.train_data = self.dataset['train'].filter(self.not_none)
+        self.val_data = self.dataset['validation'].filter(self.not_none)
 
     def setup_model_and_tokenizer(self):
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=512)
