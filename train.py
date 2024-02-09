@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore")
+
 import logging
 import torch
 from transformers import AutoModelForMultipleChoice, AutoTokenizer, TrainingArguments, Trainer
@@ -10,12 +13,13 @@ from typing import Optional, Union
 import pandas as pd, numpy as np, torch
 from datasets import Dataset,load_dataset
 from dataclasses import dataclass
-from transformers import AutoTokenizer, EvalPrediction
+from transformers import AutoTokenizer
 from transformers import EarlyStoppingCallback
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase, PaddingStrategy
 from transformers import AutoModelForMultipleChoice, TrainingArguments, Trainer
 
 import config as cfg
+import argparse 
 
 # set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,20 +53,42 @@ class DataCollatorForMultipleChoice:
         return batch
 
 class EvalModel:
-    def __init__(self, model_path, test_file, preprocess_function, max_input=384):
-        self.test_file = test_file
-        self.preprocess = preprocess_function
-        self.MAX_INPUT = max_input
+    def __init__(self, model_path, max_input=384, name_eval="natnitaract/kaggel-llm-science-exam-2023-RAG"):
         self.model = AutoModelForMultipleChoice.from_pretrained(model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.MAX_INPUT = max_input
+        self.name_eval = name_eval
         self.trainer = Trainer(model=self.model)
+        self.option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
+        self.index_to_option = {v: k for k, v in self.option_to_index.items()}
 
-    @staticmethod
+    def not_none(self, example):
+        fields_to_check = ['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer']
+        return all(example[field] is not None for field in fields_to_check)
+
+    def preprocess(self, example):
+        context = " ".join(example['context']) if isinstance(example['context'], list) else example['context']
+        first_sentence = ["[CLS] " + context] * 5
+        prompt = example['prompt'] if isinstance(example['prompt'], str) else " ".join(example['prompt'])
+        second_sentences = [
+            " #### " + prompt + " [SEP] " + 
+            (" ".join(example[option]) if isinstance(example[option], list) else example[option]) + 
+            " [SEP]" for option in 'ABCDE'
+        ]
+        tokenized_example = self.tokenizer(first_sentence, second_sentences, 
+                                        padding=True, truncation=True, 
+                                        max_length=self.MAX_INPUT, add_special_tokens=False)
+
+        tokenized_example['label'] = self.option_to_index[example['answer']]
+        return tokenized_example
+
+    @staticmethod    
     def precision_at_k(r, k):
         """Precision at k"""
         assert k <= len(r)
         assert k != 0
         return sum(int(x) for x in r[:k]) / k
-
+    
     @staticmethod
     def MAP_at_3(predictions, true_items):
         """
@@ -80,20 +106,22 @@ class EvalModel:
         return map_at_3 / U
 
     def evaluate(self):
-        test_df = pd.read_csv(self.test_file)
-        tokenized_test_dataset = Dataset.from_pandas(test_df).map(
-            self.preprocess, remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E']
+        dataset = load_dataset(self.name_eval)
+        val_data = dataset['validation'].filter(self.not_none)
+
+        tokenized_test_dataset = val_data.map(
+            self.preprocess,
+            remove_columns=val_data.column_names
         )
-        
-        test_predictions = self.trainer.predict(tokenized_test_dataset).predictions
-        predictions_as_ids = np.argsort(-test_predictions, 1)
-        predictions_as_answer_letters = np.array(list('ABCDE'))[predictions_as_ids]
 
-        predictions_as_string = test_df['prediction'] = [' '.join(row) for row in predictions_as_answer_letters[:, :3]]
-        logging.info(predictions_as_string)
+        predictions = self.trainer.predict(tokenized_test_dataset).predictions
+        predictions = np.argmax(predictions, axis=1)
 
-        mAP = EvalModel.MAP_at_3(test_df.prediction.values, test_df.answer.values)
-        logging.info(f'CV MAP@3 = {mAP}')
+        predictions_as_letters = [self.index_to_option[pred] for pred in predictions]
+
+        true_answers = val_data['answer']
+        mAP = self.MAP_at_3(predictions_as_letters, true_answers)
+        print(f'CV MAP@3 = {mAP}')
         return mAP
 
 class TrainingPipeline:
@@ -129,8 +157,8 @@ class TrainingPipeline:
 
     def load_data(self):
         self.dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG")
-        self.train_data = self.dataset['train'].filter(self.not_none)
-        self.val_data = self.dataset['validation'].filter(self.not_none)
+        self.train_data = self.dataset['train'].filter(self.not_none).shuffle(seed=42).select(range(20))
+        self.val_data = self.dataset['validation'].filter(self.not_none).shuffle(seed=42).select(range(20))
 
     def setup_model_and_tokenizer(self):
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=512)
@@ -208,8 +236,12 @@ class TrainingPipeline:
     def save_model(self):
         self.trainer.save_model(cfg.OUTPUT_DIR)
 
-    def evaluate(self, eva_file=cfg.INPUT_EVA):
-        evaluator = EvalModel(cfg.OUTPUT_DIR, eva_file, self.preprocess)
+    def evaluate(self, name_eval="natnitaract/kaggel-llm-science-exam-2023-RAG"):
+        evaluator = EvalModel(
+            model_path=cfg.OUTPUT_DIR, 
+            name_eval=name_eval
+            )
+
         return evaluator.evaluate()
 
     def run_pipeline(self):
@@ -235,9 +267,21 @@ class TrainingPipeline:
         self.evaluate()
     
         logging.info("Pipeline completed.")
+    
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Process")
+    parser.add_argument('--train', action='store_true', help="Run training pipeline")
+    parser.add_argument('--eval', action='store_true', help="Run evaluation")
+    return parser.parse_args()
 
 if __name__ == "__main__":
 
+    args = parse_arguments()
     pipeline = TrainingPipeline()
-    pipeline.run_pipeline()
-    pipeline.evaluate()
+
+    if args.train:
+        logging.info("Running training...")
+        pipeline.run_pipeline()
+    if args.eval:
+        logging.info("Running evaluation...")
+        pipeline.evaluate()

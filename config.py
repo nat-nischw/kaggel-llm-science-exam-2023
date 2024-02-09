@@ -111,8 +111,5 @@ OVERWRITE_OUTPUT_DIR = True
 LOAD_BEST_MODEL_AT_END = True
 
 ################## INPUT/OUTPUT DIRECTORY ##################
-INPUT_TRAIN = './data/train-val/train.csv'
-INPUT_VAL = './data/train-val/val.csv'
-INPUT_EVA = './data/eva.csv'
 OUTPUT_DIR = f'./output/{MODEL}-ver{VER}'
 

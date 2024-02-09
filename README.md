@@ -11,7 +11,11 @@ bash run.sh
 ```
 ## Fine-Tuning
 ```
-python train.py
+python train.py --train
+```
+## Eval-Model
+```
+python train.py --eval
 ```
 
 ## Team Members
