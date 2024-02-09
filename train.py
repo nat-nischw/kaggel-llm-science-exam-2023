@@ -10,7 +10,7 @@ from typing import Optional, Union
 import pandas as pd, numpy as np, torch
 from datasets import Dataset,load_dataset
 from dataclasses import dataclass
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, EvalPrediction
 from transformers import EarlyStoppingCallback
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase, PaddingStrategy
 from transformers import AutoModelForMultipleChoice, TrainingArguments, Trainer
@@ -150,13 +150,16 @@ class TrainingPipeline:
         self.tokenized_train = self.train_data.map(
             self.preprocess,  
             remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'], 
+            num_proc = 4
         )
         
         self.tokenized_valid = self.val_data.map(
             self.preprocess, 
             remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'],
+            num_proc = 4
         )
-    def map_at_3(predictions, labels):
+
+    def map_at_3(self, predictions, labels):
         map_sum = 0
         pred = np.argsort(-1*np.array(predictions),axis=1)[:,:3]
         for x,y in zip(pred,labels):
@@ -164,7 +167,7 @@ class TrainingPipeline:
             map_sum += np.sum(z)
         return map_sum / len(predictions)
 
-    def compute_metrics(p):
+    def compute_metrics(self, p):
         predictions = p.predictions.tolist()
         labels = p.label_ids.tolist()
         return {"map@3": self.map_at_3(predictions, labels)}
