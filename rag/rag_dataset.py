@@ -1,4 +1,5 @@
 """
+--- This is part-infer --- 
 Retrieval-Augmented Generation (RAG) model for open-domain question answering.
 Author (Research and Developed):  Teetouch Jaknamon, Natapong Nitarach
 LICENSE: CC-BY-SA-3.0
@@ -17,7 +18,7 @@ import pandas as pd
 import faiss
 from faiss import read_index
 from sklearn.feature_extraction.text import TfidfVectorizer
-from datasets import Dataset, load_from_disk
+from datasets import Dataset, load_from_disk, load_dataset
 from sentence_transformers import SentenceTransformer
 import torch
 
@@ -27,13 +28,23 @@ def clean_memory():
     ctypes.CDLL("libc.so.6").malloc_trim(0)
     torch.cuda.empty_cache()
 
-def retrival_template(example):
-    options = ["context","category"]
-    prompt_context = ["Represent this sentence for searching relevant passages:", example["instruction"]]
-
-    prompt_context.extend([f"{opt}){example[opt]}" for opt in options])
-    example['full_text'] = '\n'.join(prompt_context)
+def replace_none_with_placeholder(example):
+    for key in example.keys():
+        if example[key] is None:
+            example[key] = "There is no correct answer"
     return example
+
+def retrival_template(example):
+    prompt_context = "Represent this sentence for searching relevant passages: "
+    prompt_context += example["prompt"] + "\n"
+    prompt_context += "A)" + example["A"] + "\n"
+    prompt_context += "B)" + example["B"] + "\n"
+    prompt_context += "C)" + example["C"] + "\n"
+    prompt_context += "D)" + example["D"] + "\n"
+    prompt_context += "E)" + example["E"] + "\n"
+    example['full_text'] = prompt_context
+    return example
+
 
 def construct_corpus(row):
     """Construct the corpus for the TF-IDF vectorizer."""
@@ -135,13 +146,13 @@ def get_top_context(example, retrieved_articles_parsed):
     return example
 
 def main():
-    MODEL_PATH = "embedding/finetune"
+    EMBED_MODEL = "BAAI/bge-small-en-v1.5"
     N_BATCHES = 5
     MAX_CONTEXT = 3200
     MAX_LENGTH = 4096
-    CSV_PATH = "/data/train.csv"
-    FAISS_FOLDER = '/data/faissbatchall'
-    DATA_FOLDER = '/data/wekiall6m'
+    DATASET_NAME = "natnitaract/kaggel-llm-science-exam-2023-RAG"
+    FAISS_FOLDER = './asset/data/vector_index/'
+    DATA_FOLDER = './asset/data/keyword_index/'
     K_TOP = 15
 
     stop_words = ['each', 'you', 'the', 'use', 'used', 'where', 'themselves', 'nor', "it's", 'how', "don't", 'just', 'your',
@@ -157,16 +168,14 @@ def main():
                   'yours', 'but', 'being', "wasn't", 'be']
 
     # load embed model
-    model = SentenceTransformer(MODEL_PATH)
+    model = SentenceTransformer(EMBED_MODEL)
 
     # load data
-    test = pd.read_csv(CSV_PATH)
-
-    test = test[['prompt', 'A', 'B', 'C', 'D', 'E', 'answer']]
-    test['id'] = test.index
-
-    test = Dataset.from_pandas(test)
+    dataset = load_dataset(DATASET_NAME)
+    test = dataset['validation']
+    test = test.map(replace_none_with_placeholder)
     test = test.map(retrival_template)
+    
     logging.info(test)
 
     query_vector = model.encode(test['full_text'], normalize_embeddings=True, convert_to_tensor=True, device="cuda")
@@ -246,7 +255,7 @@ def main():
     df = test.to_pandas()
     df = df[["id", "prompt", "context", "A", "B", "C", "D", "E", "answer"]]
 
-    df.to_csv(f"/result/{CSV_PATH}", index=False)
+    df.to_csv(f"./asset/data/result/{CSV_PATH}", index=False)
 
     # Cleanup
     clean_memory()
