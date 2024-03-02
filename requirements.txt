@@ -16,3 +16,6 @@ colorama==0.4.6
 sentencepiece==0.1.99
 wandb==0.16.2
 git+https://github.com/huggingface/transformers.git@5346db1#egg=transformers
+faiss-gpu==1.7.2
+scikit-learn==1.4.0
+sentence-transformers==2.5.1
