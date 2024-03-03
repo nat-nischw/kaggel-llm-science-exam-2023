@@ -7,8 +7,17 @@ In the Kaggle competition, we are not able to unlock certain features because Ka
 
 ## Installation
 ```
-bash run.sh
+bash script/run.sh
 ```
+```
+bash script/data_prep.sh
+```
+## Retrieval Augmented Generation (RAG)
+### Infer
+```
+python rag/infer_rag.py
+```
+
 ## Fine-Tuning
 ```
 python train.py --train
