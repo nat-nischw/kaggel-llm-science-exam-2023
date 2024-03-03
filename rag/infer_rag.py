@@ -28,7 +28,8 @@ import gc, os
 
 import re
 import ctypes
-libc = ctypes.CDLL("libc.so.6")
+from ctypes import CDLL
+libc = CDLL(None)
 
 
 import logging
@@ -45,9 +46,40 @@ from tqdm.auto import tqdm
 from pathlib import Path
 from string import Template
 
-import torch
-from ctypes import CDLL
-libc = CDLL(None)
+from sentence_transformers import SentenceTransformer
+
+# config 
+
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+N_BATCHES = 5
+MAX_CONTEXT = 3200
+MAX_LENGTH = 4096
+DATASET_NAME = "natnitaract/kaggel-llm-science-exam-2023-RAG"
+FAISS_FOLDER = './asset/data/vector_index/'
+DATA_FOLDER = './asset/data/keyword_index/'
+K_TOP = 15
+DATA_TYPE = "validation" #Train
+
+stop_words = ['each', 'you', 'the', 'use', 'used', 'where', 'themselves', 'nor', "it's", 'how', "don't", 'just', 'your',
+                  'about', 'himself', 'with', "weren't", 'hers', "wouldn't", 'more', 'its', 'were', 'his', 'their', 'then',
+                  'been', 'myself', 're', 'not', 'ours', 'will', 'needn', 'which', 'here', 'hadn', 'it', 'our', 'there',
+                  'than', 'most', "couldn't", 'both', 'some', 'for', 'up', 'couldn', "that'll", "she's", 'over', 'this',
+                  'now', 'until', 'these', 'few', 'haven', 'of', 'wouldn', 'into', 'too', 'to', 'very', 'shan', 'before',
+                  'the', 'they', 'between', "doesn't", 'are', 'was', 'out', 'we', 'me', 'after', 'has', "isn't", 'have',
+                  'such', 'should', 'yourselves', 'or', 'during', 'herself', 'doing', 'in', "shouldn't", "won't", 'when',
+                  'do', 'through', 'she', 'having', 'him', "haven't", 'against', 'itself', 'that', 'did', 'theirs', 'can',
+                  'those', 'own', 'so', 'and', 'who', "you've", 'yourself', 'her', 'he', 'only', 'what', 'ourselves',
+                  'again', 'had', "you'd", 'is', 'other', 'why', 'while', 'from', 'them', 'if', 'above', 'does', 'whom',
+                  'yours', 'but', 'being', "wasn't", 'be']
+
+
+def get_top_context(example, idx):
+    context = ""
+    for text in retrieved_articles_parsed[idx][::-1]:
+        context += text[1]
+        context += "\n"
+    example['context'] = context
+    return example
 
 def clean_memory():
     gc.collect()
@@ -170,129 +202,91 @@ def get_relevant_documents(df_valid):
     return retrieved_articles
 
 
-def get_top_context(example, idx):
-    context = ""
-    for text in retrieved_articles_parsed[idx][::-1]:
-        context += text[1]
-        context += "\n"
-    example['context'] = context
-    return example
+model = SentenceTransformer(EMBED_MODEL)
 
 
-def main():
-    EMBED_MODEL = "BAAI/bge-small-en-v1.5"
-    N_BATCHES = 5
-    MAX_CONTEXT = 3200
-    MAX_LENGTH = 4096
-    DATASET_NAME = "natnitaract/kaggel-llm-science-exam-2023-RAG"
-    FAISS_FOLDER = './asset/data/vector_index/'
-    DATA_FOLDER = './asset/data/keyword_index/'
-    K_TOP = 15
+dataset = load_dataset(DATASET_NAME)
+test = dataset[DATA_TYPE]
+test = test.map(replace_none_with_placeholder)
+test = test.map(retrival_template)
 
-    stop_words = ['each', 'you', 'the', 'use', 'used', 'where', 'themselves', 'nor', "it's", 'how', "don't", 'just', 'your',
-                  'about', 'himself', 'with', "weren't", 'hers', "wouldn't", 'more', 'its', 'were', 'his', 'their', 'then',
-                  'been', 'myself', 're', 'not', 'ours', 'will', 'needn', 'which', 'here', 'hadn', 'it', 'our', 'there',
-                  'than', 'most', "couldn't", 'both', 'some', 'for', 'up', 'couldn', "that'll", "she's", 'over', 'this',
-                  'now', 'until', 'these', 'few', 'haven', 'of', 'wouldn', 'into', 'too', 'to', 'very', 'shan', 'before',
-                  'the', 'they', 'between', "doesn't", 'are', 'was', 'out', 'we', 'me', 'after', 'has', "isn't", 'have',
-                  'such', 'should', 'yourselves', 'or', 'during', 'herself', 'doing', 'in', "shouldn't", "won't", 'when',
-                  'do', 'through', 'she', 'having', 'him', "haven't", 'against', 'itself', 'that', 'did', 'theirs', 'can',
-                  'those', 'own', 'so', 'and', 'who', "you've", 'yourself', 'her', 'he', 'only', 'what', 'ourselves',
-                  'again', 'had', "you'd", 'is', 'other', 'why', 'while', 'from', 'them', 'if', 'above', 'does', 'whom',
-                  'yours', 'but', 'being', "wasn't", 'be']
+query_vector = model.encode(test['full_text'], normalize_embeddings=True, convert_to_tensor=True, device ="cuda")
+query_vector = query_vector.detach().cpu().numpy()
 
-    ### Step-1 ###
-    # load embed model
-    model = SentenceTransformer(EMBED_MODEL)
 
-    # load data
-    dataset = load_dataset(DATASET_NAME)
-    test = dataset['validation']
-    test = test.map(replace_none_with_placeholder)
-    test = test.map(retrival_template)
-    
-    logging.info(test)
+res = os.listdir(FAISS_FOLDER)
+res = sorted(res)
+print(res)
 
-    query_vector = model.encode(test['full_text'], normalize_embeddings=True, convert_to_tensor=True, device="cuda")
-    query_vector = query_vector.detach().cpu().numpy()
 
-    res = os.listdir(FAISS_FOLDER)
-    res = sorted(res)
-    logging.info(res)
+k = 15
+dict_all = []
 
-    k = K_TOP
-    dict_all = []
-    res_gpu = faiss.StandardGpuResources()
-    libc = ctypes.CDLL(None)
+res_gpu = faiss.StandardGpuResources()
+libc = CDLL(None)
 
-    for data in res:
-        # Extract the batch number from the index filename
-        num_batch = re.findall(r'\d+', data)
-        dataset_name = DATA_FOLDER + "/SciBatch" + str(num_batch[0])
+for data in res:
+    # Extract the batch number from the index filename
+    num_batch = re.findall(r'\d+', data)
+    dataset_name = DATA_FOLDER + "/SciBatch" + str(num_batch[0])
 
-        # Load the dataset
-        ds = load_from_disk(dataset_name)
-        print('read index...')
+    # Load the dataset
+    ds = load_from_disk(dataset_name)
+    print('read index...')
 
-        # Load the FAISS index and convert to GPU
-        index = faiss.read_index(f"{FAISS_FOLDER}/{data}")
-        index = faiss.index_cpu_to_gpu(res_gpu, 0, index)
+    # Load the FAISS index and convert to GPU
+    index = faiss.read_index(f"{FAISS_FOLDER}/{data}")
+    index = faiss.index_cpu_to_gpu(res_gpu, 0, index)
 
-        # Optionally, set nprobe for faster search (trade-off with accuracy)
-        index.nprobe = 30
+    # Optionally, set nprobe for faster search (trade-off with accuracy)
+    index.nprobe = 30
 
-        # Search for the k-nearest neighbors
-        distances, indices = index.search(query_vector, k)
+    # Search for the k-nearest neighbors
+    distances, indices = index.search(query_vector, k)
 
-        # Build the dictionary
-        for distance_row, index_row in zip(distances, indices):
-            inner_list = [
-                {ds[int(idx)]['text']: dist}
-                for idx, dist in zip(index_row, distance_row)
-            ]
-            dict_all.append(inner_list)
+    # Build the dictionary
+    for distance_row, index_row in zip(distances, indices):
+        inner_list = [
+            {ds[int(idx)]['text']: dist}
+            for idx, dist in zip(index_row, distance_row)
+        ]
+        dict_all.append(inner_list)
 
-        # Cleanup
-        del index, ds
-        torch.cuda.empty_cache()
-
-    ### Step-2 ###
-    text_list = []
-    para_length = 14 #adjust
-
-    for i in range(len(dict_all)):
-        sorted_data = sorted(dict_all[i], key=lambda x: list(x.values())[0])
-        keys_list = [key for dictionary in sorted_data[:para_length] for key in dictionary.keys()]
-        for text in keys_list:
-
-    del query_vector
-    _ = gc.collect()
-    libc.malloc_trim(0)
+    # Cleanup
+    del index, ds
     torch.cuda.empty_cache()
 
-    text_list2 = (list(set(text_list)))
-    logging.info(f'Number of unique paragraphs: {len(text_list2)}')
+text_list = []
+para_length = 14 #adjust
 
-    text_dataframe = pd.DataFrame(text_list2, columns=['text'])
-    cohere_dataset_filtered = Dataset.from_pandas(text_dataframe)
+for i in range(len(dict_all)):
+    sorted_data = sorted(dict_all[i], key=lambda x: list(x.values())[0])
+    keys_list = [key for dictionary in sorted_data[:para_length] for key in dictionary.keys()]
+    for text in keys_list:
+        text_list.append(text)
 
-    logging.info(f'cohere_dataset_filtered: {cohere_dataset_filtered}')
+del query_vector
+_ = gc.collect()
+libc.malloc_trim(0)
+torch.cuda.empty_cache()
 
-    df_valid = test.to_pandas()
-    df_valid['id'] = df_valid.index
+text_list2 = (list(set(text_list)))
+text_dataframe = pd.DataFrame(text_list2, columns=['text'])
+cohere_dataset_filtered = Dataset.from_pandas(text_dataframe)
 
-    stop_words_processed = [word.lower().replace("'", "").replace("-", "") for word in stop_words]
+stop_words_processed = [word.lower().replace("'", "").replace("-", "") for word in stop_words]
+df_valid = test.to_pandas().reset_index().rename(columns={'index': 'id'})
 
-    retrieved_articles_parsed = get_relevant_documents(df_valid)
-    gc.collect()
+retrieved_articles_parsed = get_relevant_documents(df_valid)
+gc.collect()
 
-    test = test.map(get_top_context, with_indices=True)
+    
+test = test.map(get_top_context, with_indices=True)
 
-    df = test.to_pandas()
-    df = df[["id", "prompt", "context", "A", "B", "C", "D", "E", "answer"]]
+df = test.to_pandas()
+df = df[["prompt", "context", "A", "B", "C", "D", "E", "answer"]]
+df.to_csv(f"./asset/data/output.csv", index=False)
 
-    df.to_csv(f"./output.csv", index=False)
 
 
-if __name__ == "__main__":
-    main()
+
