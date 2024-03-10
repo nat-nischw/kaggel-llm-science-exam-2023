@@ -151,17 +151,23 @@ class TrainingPipeline:
         tokenized_example['label'] = self.option_to_index[example['answer']]
         return tokenized_example
 
+    def replace_none_with_placeholder(self, example):
+        for key in example.keys():
+            if example[key] is None:
+                example[key] = "There is no correct answer"
+        return example
+
     def not_none(self, example):
-        fields_to_check = ['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer']
+        fields_to_check = ['prompt', 'answer']
         return all(example[field] is not None for field in fields_to_check)
 
     def load_data(self):
-        self.dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG")
-        self.train_data = self.dataset['train'].filter(self.not_none)
-        self.val_data = self.dataset['validation'].filter(self.not_none)
+        self.dataset = load_dataset("natnitaract/kaggel-llm-science-exam-2023-RAG").map(self.replace_none_with_placeholder), load_dataset("natnitaract/h2o-kaggel-llm-science-exam-2023-rag")
+        self.train_data = self.dataset[-1]['train'].filter(self.not_none)
+        self.val_data = self.dataset[0]['validation'].filter(self.not_none)
 
     def setup_model_and_tokenizer(self):
-        self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=512)
+        self.tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL, use_fast=True, max_length=self.MAX_INPUT)
         self.model = AutoModelForMultipleChoice.from_pretrained(cfg.MODEL, ignore_mismatched_sizes=True)
         
         if cfg.FREEZE_EMBEDDINGS:
