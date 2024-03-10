@@ -152,7 +152,7 @@ class TrainingPipeline:
         return tokenized_example
 
     def replace_none_with_placeholder(self, example):
-        fields_to_replace = ['A', 'B', 'C', 'D', 'E', 'answer']
+        fields_to_replace = ['A', 'B', 'C', 'D', 'E']
         for field in fields_to_replace:
             if example[field] is None:
                 example[field] = "There is no correct answer"
