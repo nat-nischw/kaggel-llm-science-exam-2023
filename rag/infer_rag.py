@@ -5,12 +5,6 @@ Author (Research and Developed):  Teetouch Jaknamon, Natapong Nitarach
 LICENSE: CC-BY-SA-3.0
 """
 
-# For LLM
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, AutoModel
-from accelerate import init_empty_weights
-from accelerate.utils.modeling import set_module_tensor_to_device
-from safetensors.torch import load_file
-
 import datasets
 from datasets import Dataset, load_from_disk, load_dataset
 from torch.utils.data import DataLoader
