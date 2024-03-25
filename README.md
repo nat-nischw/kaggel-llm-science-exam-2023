@@ -18,7 +18,8 @@ In the face of limited GPU resources, specifically the P100 available on Kaggle,
 
 ### Thought of Query
 
-![Illustration of the Thought of Query (ToQ) System Implementing RAG for Enhanced LLM Performance](asset/ToQ.png)
+<img src="asset/ToQ.png" alt="Illustration of the Thought of Query (ToQ) System Implementing RAG for Enhanced LLM Performance" width="1200" height="400">
+
 
 From the figure above: The system leverages Retrieval Augmented Generation (RAG) to enhance the efficacy of Large Language Models (LLMs) in response generation. This implementation, dubbed Thought of Query (ToQ), incorporates the following elements:
 
