@@ -63,4 +63,8 @@ Teetouch Jaknamon - [@TeetouchQQ](https://github.com/TeetouchQQ), Natapong Nitar
 ## Mentor Spotlight
 Chris Deotte - [@cdeotte](https://github.com/cdeotte), Mohammadreza Banaei - [@MohammadrezaBanaei](https://github.com/MohammadrezaBanaei), Kaggle Community - [Kaggle - LLM Science Exam](https://www.kaggle.com/competitions/kaggle-llm-science-exam/discussion?sort=votes)
 
-## Paper (available in soon ): 
+## Limitations and Discussion
+### Fine-tune: 
+
+In this training iteration, we have not yet employed [QLoRA (Efficient Finetuning of Quantized LLMs)](https://arxiv.org/abs/2305.14314) as a fine-tuning technique. QLoRA is known for its efficiency in reducing the computational cost of training. This technique facilitates the adjustment of input context length, thereby optimizing the model's capacity to handle varying lengths of input data. It is worth mentioning that QLoRA can be conceptually linked to the [LongLoRA)](https://arxiv.org/abs/2309.12307) and [LongAlpaca)](https://github.com/dvlab-research/LongLoRA) for Long-context LLMs technique, as both share a commonality in their approach to handling input context length adjustments. However for the intent of training lora models, we created other lab's methodologies available here [lingjoor-research/finetuning-model-qlora](https://github.com/lingjoor-research/finetuning-model-qlora) for use in other labs.
+## Fully Paper (Available in soon): 
